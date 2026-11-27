@@ -7,10 +7,10 @@ import { samePageSection, scrollToSection } from '@/lib/smoothScroll';
 import type { SharedProps } from '@/lib/types';
 
 const SECTIONS = [
-    { href: '/#inicio', label: 'Início' },
-    { href: '/#ativos', label: 'Ativos' },
-    { href: '/#agilidade', label: 'Agilidade' },
-    { href: '/#ferramentas', label: 'Ferramentas' },
+    { href: '/#mercados', label: 'Mercados' },
+    { href: '/#como-funciona', label: 'Como funciona' },
+    { href: '/#plataforma', label: 'Plataforma' },
+    { href: '/#pix', label: 'Depósitos' },
 ];
 
 export default function PublicLayout({ children }: { children: ReactNode }) {

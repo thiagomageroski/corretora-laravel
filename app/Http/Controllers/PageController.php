@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Market\AssetCatalogQuery;
 use App\Domain\Market\AssetViews;
 use App\Domain\Market\CandleService;
+use App\Domain\Market\ProviderRegistry;
 use App\Domain\Trading\PerformanceSummary;
 use App\Enums\CandleInterval;
 use App\Enums\Environment;
@@ -17,10 +18,10 @@ use App\Models\AssetCategory;
 use App\Models\WalletTransaction;
 use App\Support\TradingEnvironment;
 use App\Support\WalletSummary;
+use Illuminate\Auth\SessionGuard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Auth\SessionGuard;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -30,16 +31,33 @@ class PageController extends Controller
 
     private const MOVERS_MAX_QUOTE_AGE_MINUTES = 10;
 
-    public function landing(CandleService $candles): Response
+    public function landing(CandleService $candles, ProviderRegistry $providers): Response
     {
+        // Providers whose assets can really be traded: a live feed plus the price at the second of expiry.
+        $tradableProviders = Asset::query()->active()->whereNotNull('provider_code')->distinct()->pluck('provider_code')
+            ->filter(function (string $code) use ($providers): bool {
+                $provider = $providers->find($code);
+
+                return $provider !== null && $provider->isConfigured() && $provider->supportsSimulatedTrading();
+            })
+            ->values()
+            ->all();
+
         return Inertia::render('Landing', [
-            'categories' => AssetCategory::query()->withCount(['assets' => fn ($query) => $query->active()])->orderBy('sort')->get(['id', 'code', 'name']),
+            'categories' => AssetCategory::query()
+                ->withCount([
+                    'assets' => fn ($query) => $query->active(),
+                    'assets as tradable_count' => fn ($query) => $query->active()->whereIn('provider_code', $tradableProviders),
+                ])
+                ->orderBy('sort')
+                ->get(['id', 'code', 'name']),
             'canRegister' => ! Auth::check(),
             'snapshot' => $this->quoteSnapshot(),
-            'featuredAssets' => Asset::query()->active()->orderBy('id')->limit(16)->pluck('name'),
             'figures' => [
                 'payout_percent' => intdiv((int) config('platform.trading.default_payout_bps'), 100),
+                'payout_bps' => (int) config('platform.trading.default_payout_bps'),
                 'min_stake_cents' => (int) config('platform.trading.min_stake_cents'),
+                'max_stake_cents' => (int) config('platform.trading.max_stake_cents'),
                 'durations_seconds' => config('platform.trading.durations_seconds'),
                 'demo_balance_cents' => (int) config('platform.demo.initial_balance_cents'),
                 'min_deposit_cents' => (int) config('platform.real.min_deposit_cents'),

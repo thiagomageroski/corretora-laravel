@@ -151,7 +151,21 @@ class PagesTest extends TestCase
             ->component('Landing')
             ->where('figures.min_deposit_cents', 3_000)
             ->where('figures.payout_percent', 87)
-            ->has('featuredAssets'));
+            ->where('figures.payout_bps', 8_700));
+    }
+
+    #[Test]
+    public function the_landing_page_tells_tradable_assets_from_those_only_shown(): void
+    {
+        Asset::factory()->count(2)->create();
+        Asset::factory()->withoutProvider()->create();
+        Asset::factory()->state(['is_active' => false])->create();
+
+        $this->get('/')->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Landing')
+            ->where('categories.0.code', 'crypto')
+            ->where('categories.0.assets_count', 3)
+            ->where('categories.0.tradable_count', 2));
     }
 
     #[Test]
